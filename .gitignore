@@ -36,8 +36,8 @@
 *.sapp
 *~
 *\\#
+build/*
 
-Makefile
 Makefile.in
 
 # hwloc and pmix have been de-modularized, but still uses parts of the

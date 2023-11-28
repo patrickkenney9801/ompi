@@ -38,7 +38,7 @@ RUN apt update && apt install -y --no-install-recommends \
   openssh-server \
   openssh-client \
   libcap2-bin \
-  && rm -rf /var/lib/apt/lists/*
+  && apt clean
 # Add priviledge separation directoy to run sshd as root.
 RUN mkdir -p /var/run/sshd
 # Add capability to run sshd as non-root.
@@ -56,15 +56,31 @@ RUN sed -i "s/[ #]\(.*StrictHostKeyChecking \).*/ \1no/g" /etc/ssh/ssh_config \
   && sed -i "s/#\(StrictModes \).*/\1no/g" /etc/ssh/sshd_config \
   && sed -i "s/#\(Port \).*/\1$port/g" /etc/ssh/sshd_config
 
-RUN useradd -m mpiuser
-WORKDIR /home/mpiuser
+ARG UID=9801
+ARG GID=9801
+ARG UNAME=mpiuser
+RUN if [ "${UNAME}" != "root" ] && ! [ id ${UID} ] ; then groupadd -g ${GID} ${UNAME} \
+  && useradd -ms /bin/bash  -u "${UID}" -g "${GID}" ${UNAME} \
+  && mkdir -p /home/${UNAME} \
+  && chown ${UNAME}:${UNAME} /home/${UNAME}; \
+  fi
+
+WORKDIR /home/${UNAME}
 # Configurations for running sshd as non-root.
-RUN echo "PidFile /home/mpiuser/sshd.pid" >> /home/mpiuser/.sshd_config
-RUN echo "HostKey /home/mpiuser/.ssh/id_rsa" >> /home/mpiuser/.sshd_config
-RUN echo "StrictModes no" >> /home/mpiuser/.sshd_config
-RUN echo "Port $port" >> /home/mpiuser/.sshd_config
+RUN echo "PidFile /home/${UNAME}/sshd.pid" >> /home/${UNAME}/.sshd_config
+RUN echo "HostKey /home/${UNAME}/.ssh/id_rsa" >> /home/${UNAME}/.sshd_config
+RUN echo "StrictModes no" >> /home/${UNAME}/.sshd_config
+RUN echo "Port $port" >> /home/${UNAME}/.sshd_config
+
+RUN apt update && apt install -y --no-install-recommends \
+  zlib1g \
+  && apt clean
 
 ARG OMPI_PREFIX_PATH=/opt/openmpi
 COPY --chown=root:root build ${OMPI_PREFIX_PATH}
 RUN ln -s ${OMPI_PREFIX_PATH}/bin/* /bin/
 RUN ln -s ${OMPI_PREFIX_PATH}/lib/* /lib/
+RUN ln -s ${OMPI_PREFIX_PATH} /opt/openmpi
+RUN ln -s ${OMPI_PREFIX_PATH} /usr/lib/x86_64-linux-gnu/openmpi
+
+USER ${UNAME}

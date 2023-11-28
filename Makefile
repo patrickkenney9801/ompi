@@ -3,7 +3,7 @@ SHELL := /bin/bash
 IMAGE_NAME ?= ompi-dev
 IMAGE_VERSION ?= latest
 RELEASE_IMAGE_NAME ?= ompi
-RELEASE_IMAGE_VERSION ?= 5.0.2
+RELEASE_IMAGE_VERSION ?= 5.1.0a1
 SRC_DIR ?= $(shell pwd)
 
 PROFILE ?= observability
@@ -36,13 +36,12 @@ build-image:
 	--file Containerfile \
 	--target build .
 
-run-image:
+build-run:
 	@${CONTAINER_TOOL} --context ${CONTAINER_CONTEXT} run --rm \
 	-v ${SRC_DIR}/:${CONTAINER_SRC_DIR} \
 	${OMPI_CONTAINER_MOUNTS} \
 	${OMPI_CONTAINER_ENV} \
 	--privileged \
-	--network host \
 	--workdir=${CONTAINER_WORK_DIR} ${CONTAINER_OPTS} -${INTERACTIVE}t \
 	${IMAGE_NAME}:${IMAGE_VERSION} ${CONTAINER_CMD}
 
@@ -53,7 +52,8 @@ setup:
 .PHONY: configure
 configure:
 	@mkdir -p ${CONTAINER_BUILD_DIR}
-	@cd ${CONTAINER_BUILD_DIR} && ${CONTAINER_SRC_DIR}/configure --prefix=${OMPI_PREFIX_PATH} 2>&1 | tee ${OMPI_OUTPUT_FILE}
+	@cd ${CONTAINER_BUILD_DIR} && ${CONTAINER_SRC_DIR}/configure \
+	--prefix=${OMPI_PREFIX_PATH} 2>&1 | tee ${OMPI_OUTPUT_FILE}
 
 .PHONY: build
 build:
@@ -66,9 +66,12 @@ deploy-image:
 	-t ${RELEASE_IMAGE_NAME}:${RELEASE_IMAGE_VERSION} \
 	--file Containerfile \
 	--target release .
-	@minikube -p ${PROFILE} image load ${RELEASE_IMAGE_NAME}:${RELEASE_IMAGE_VERSION}
 
-run-deploy:
+deploy-run:
 	@${CONTAINER_TOOL} --context ${CONTAINER_CONTEXT} run --rm \
+	--privileged \
 	-${INTERACTIVE}t \
 	${RELEASE_IMAGE_NAME}:${RELEASE_IMAGE_VERSION} ${CONTAINER_CMD}
+
+deploy-load:
+	@minikube -p ${PROFILE} image load ${RELEASE_IMAGE_NAME}:${RELEASE_IMAGE_VERSION}
